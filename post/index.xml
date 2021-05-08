@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Posts on Brannon Tatum</title>
+    <link>/post/</link>
+    <description>Recent content in Posts on Brannon Tatum</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-US</language>
+    <lastBuildDate>Fri, 07 May 2021 00:00:00 +0000</lastBuildDate><atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>R Studio and Python</title>
+      <link>/post/2021/05/07/r-studio-and-python/</link>
+      <pubDate>Fri, 07 May 2021 00:00:00 +0000</pubDate>
+      
+      <guid>/post/2021/05/07/r-studio-and-python/</guid>
+      <description>Python and R are two languages used for coding. In this blog post, I am going to demonstrate coding with R and coding with python. I will then use reticulate to demonstrate how R code and python code communicate and can be used together. Finally, I will add an image of the Survivor logo to demonstrate inserting visuals in an R Markdown file.
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents.</description>
+    </item>
+    
+  </channel>
+</rss>

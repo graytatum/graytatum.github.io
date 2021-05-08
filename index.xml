@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Brannon Tatum</title>
+    <link>/</link>
+    <description>Recent content on Brannon Tatum</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-US</language>
+    <lastBuildDate>Fri, 07 May 2021 00:00:00 +0000</lastBuildDate><atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>R Studio and Python</title>
+      <link>/post/2021/05/07/r-studio-and-python/</link>
+      <pubDate>Fri, 07 May 2021 00:00:00 +0000</pubDate>
+      
+      <guid>/post/2021/05/07/r-studio-and-python/</guid>
+      <description>Python and R are two languages used for coding. In this blog post, I am going to demonstrate coding with R and coding with python. I will then use reticulate to demonstrate how R code and python code communicate and can be used together. Finally, I will add an image of the Survivor logo to demonstrate inserting visuals in an R Markdown file.
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents.</description>
+    </item>
+    
+    <item>
+      <title>Project 1: Exploratory Data Analysis</title>
+      <link>/project/project1/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/project/project1/</guid>
+      <description>0. Introduction (4 pts) I chose two datasets containing information regarding ABC’s “The Bachelor” contestants. The variables they contain are age, name, state, weeks lasted, season, city, country, and outcome. I plan to use the variables name, state, outcome, season, and age (3 numeric). I acquired the datasets from a dataset platform called data.world. The demographics of these contestants can be intriguing and reveal interesting trends in who goes on reality dating shows like this and who is more likely to make it to end based on different variables.</description>
+    </item>
+    
+    <item>
+      <title>Project 2: Modeling, Testing, and Predicting</title>
+      <link>/project/project2/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/project/project2/</guid>
+      <description>0. Introduction (5 pts)
+The dataset I chose for this project is titled “Healthcare_Dataset_Stroke_data”. The dataset contains 12 variables including gender (“gender”/categorical), age (“age”/numeric), marital status (“ever_married”/categorical), work type (“work_type”/categorical), residence type (“residence_type”/categorical), average glucose level (avg_glucose_level/numeric), bmi (“bmi”/numeric), smoking status (“smoking_status”/categorical) and stroke (“stroke”, 1=yes, 0=no, binary). There are 5,110 observations for each of the 12 variables.
+healthcare_dataset_stroke_data &amp;lt;- read_csv(&amp;quot;healthcare-dataset-stroke-data.csv&amp;quot;) #read in dataset stroke &amp;lt;- healthcare_dataset_stroke_data #renaming dataset for convenience stroke &amp;lt;- stroke %&amp;gt;% mutate(bmi=na_if(bmi, &amp;quot;N/A&amp;quot;)) #recoding NAs stroke &amp;lt;- stroke %&amp;gt;% na.</description>
+    </item>
+    
+    <item>
+      <title>Projects</title>
+      <link>/projects/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/projects/</guid>
+      <description> Check out some of my coding projects below:
+ Wrangling &amp;amp; Exploratory Data Analysis
+ Modeling, Inference, Prediction
+  -- </description>
+    </item>
+    
+    <item>
+      <title>Resume</title>
+      <link>/resume/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>/resume/</guid>
+      <description>    </description>
+    </item>
+    
+  </channel>
+</rss>

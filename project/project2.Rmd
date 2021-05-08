@@ -1,0 +1,245 @@
+---
+title: 'Project 2: Modeling, Testing, and Predicting'
+author: "SDS348"
+date: ''
+output:
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+hook_output = knit_hooks$get('output')
+knit_hooks$set(output = function(x, options) {
+  # this hook is used only when the linewidth option is not NULL
+  if (!is.null(n <- options$linewidth)) {
+    x = knitr:::split_lines(x)
+    # any lines wider than n should be wrapped
+    if (any(nchar(x) > n)) x = strwrap(x, width = n)
+    x = paste(x, collapse = '\n')
+  }
+  hook_output(x, options)
+})
+
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE,fig.align="center",warning=FALSE,message=FALSE,fig.width=8, fig.height=5, linewidth=60)
+options(tibble.width = 100,width = 100)
+library(tidyverse)
+```
+**0. Introduction (5 pts)** 
+
+*The dataset I chose for this project is titled "Healthcare_Dataset_Stroke_data". The dataset contains 12 variables including gender ("gender"/categorical), age ("age"/numeric), marital status ("ever_married"/categorical), work type ("work_type"/categorical), residence type  ("residence_type"/categorical), average glucose level (avg_glucose_level/numeric), bmi ("bmi"/numeric), smoking status ("smoking_status"/categorical) and stroke ("stroke", 1=yes, 0=no, binary). There are 5,110 observations for each of the 12 variables.*
+```{r}
+healthcare_dataset_stroke_data <- read_csv("healthcare-dataset-stroke-data.csv") #read in dataset
+stroke <- healthcare_dataset_stroke_data #renaming dataset for convenience
+stroke <-  stroke %>% mutate(bmi=na_if(bmi, "N/A")) #recoding NAs
+stroke <- stroke %>% na.omit() #removing NAs
+stroke$stroke<-as.factor(stroke$stroke) #making stroke binary character
+stroke$heart_disease<-as.factor(stroke$heart_disease) 
+stroke$bmi <- as.numeric(as.character(stroke$bmi)) #making bmi numeric
+head(stroke) #preview of dataset
+
+library(sandwich) #for use later with bptest()
+library(lmtest)
+
+class_diag <- function(probs,truth){
+#CONFUSION MATRIX: CALCULATE ACCURACY, TPR, TNR, PPV
+tab<-table(factor(probs>.5,levels=c("FALSE","TRUE")),truth)
+acc=sum(diag(tab))/sum(tab)
+sens=tab[2,2]/colSums(tab)[2]
+spec=tab[1,1]/colSums(tab)[1]
+ppv=tab[2,2]/rowSums(tab)[2]
+f1=2*(sens*ppv)/(sens+ppv)
+if(is.numeric(truth)==FALSE & is.logical(truth)==FALSE) truth<-as.numeric(truth)-1
+#CALCULATE EXACT AUC
+ord<-order(probs, decreasing=TRUE)
+probs <- probs[ord]; truth <- truth[ord]
+TPR=cumsum(truth)/max(1,sum(truth))
+FPR=cumsum(!truth)/max(1,sum(!truth))
+dup<-c(probs[-1]>=probs[-length(probs)], FALSE)
+TPR<-c(0,TPR[!dup],1); FPR<-c(0,FPR[!dup],1)
+n <- length(TPR)
+auc<- sum( ((TPR[-1]+TPR[-n])/2) * (FPR[-1]-FPR[-n]) )
+data.frame(acc,sens,spec,ppv,f1,auc)
+}
+```
+
+
+**1. MANOVA (15 pts)** 
+
+*A one-way MANOVA was conducted to determine the effect of work type on two dependent variables (age and average glucose level). Significant differences were found among work type for at least one of the dependent variables, Pillai trace=0.468, pseduo F(4, 10210)=389.79, p<0.0001.*
+*Univariate ANOVAs for each dependent variable were conducted as follow-up tests to the MANOVA, using the Bonferroni method for controlling Type I error rates for multiple comparisons. The univariate ANOVAs for average glucose level and age were also significant, F(4,5105)=16.612, p<0.0001 and F(4,5105)=1110.1, p<0.0001, respectively.*
+*For post hoc tests, I used a significance level of 0.002, given I ran 1 MANOVA, 2 ANOVAs and 20 post-hoc t-tests. If left unadjusted, probability of a type I error is 1-0.95^23=0.693. Post hoc analysis was performed conducting pairwise comparisons to determine which work type differed in average glucose level and age. Average glucose level significantly differed for individuals working in government and individuals who do not work because they have children. It also significantly differed for individuals working in the private sector compare to individuals who do not work because they have children. Average glucose level also differed between those who are self-employed and individuals who do not work because they have children as well as between those who are self-employed and individuals working in the private sector. On the other hand, there is a significant mean difference in age between all work types except between those who have never worked and individuals who do not work because they have children.*
+*Assumptions for running a MANOVA include random samples, independent observations, multivariate normality of DVs, homogeneity of within-group covariance matrices, linear relationships among DVs, no extreme univariate or multivariate outliers and no multicollinearity. Given the source of the dataset is confidential, we cannot confirm nor deny the random samples, independent observations assumption. Based on the mutivariate normality plots, this dataset may not pass the mutivariate normality assumption.*
+```{r}
+man1 <- manova(cbind(avg_glucose_level, age)~work_type, data=stroke)
+summary(man1) #MANOVA
+summary.aov(man1) #Univariate ANOVAs
+pairwise.t.test(stroke$avg_glucose_level,stroke$work_type, p.adj="none") #t-test for average glucose level
+pairwise.t.test(stroke$age,stroke$work_type, p.adj="none") #t-test for age
+0.05/(20+1+2) #Bonferroni method for error
+1-0.95^23 #probability of type I error
+ggplot(stroke, aes(x = avg_glucose_level, y = age)) +
+geom_point(alpha = .5) + geom_density_2d(h=2) + coord_fixed() + facet_wrap(~work_type)
+```
+
+**2. Randomization Test (10 pts)** 
+
+*I am performing a randomization test to determine if the mean bmi is significantly different for individuals who have had a stroke compared to individuals who have not had a stroke. Ho: mean bmi is the same for individuals who have had a stroke and individuals who have not. Ha: mean bmi is different for individuals who have had a stroke and individuals who have not. After performing a randomization test on my data for mean difference, it was revealed that there is a significant different in mean bmi for individuals who have had a stroke and individuals who have not (p=0.0026).*
+```{r}
+stroke%>%group_by(stroke)%>%
+  summarize(means=mean(bmi)) %>% summarize(`mean_diff`=diff(means)) #observed mean difference in bmi for those who have had stroke vs those who have not
+
+rand_dist<-vector() #randomization test
+for(i in 1:5000){
+new<-data.frame(bmi=sample(stroke$bmi),stroke=stroke$stroke)
+rand_dist[i]<-mean(new[new$stroke==0,]$bmi)-
+mean(new[new$stroke==1,]$bmi)}
+
+mean(rand_dist>1.648228 | rand_dist< -1.648228) #two-tailed p value
+
+{hist(rand_dist,main="",ylab=""); abline(v = c(-1.648228, 1.648228),col="red")} #plot visualizing null distribution and test-statistic
+
+```
+
+**3. Linear Regression Model (40 pts)**
+
+*A linear regression predicting age from previous stroke history (1=yes,0=no) and bmi (after centering) revealed that 41.829 is the mean/predicted age for individuals who have never had a stroke with average bmi. For people with average bmi, people who have previously had a stroke have average/predicted age that is 26.810 greater than individuals who have never had a stroke, difference is significant (b=26, t=17.887, p<0.05). Estimated slope for BMI on age for people who have never had a stroke is 0.974. Slope of BMI on age for individuals who have previously had a stroke is -1.5607 less than for individuals who have never had a stroke. The proportion of the variation in the age explained by this model is 0.1668. Residuals are not perfectly normally distributed, but ok, based on a histogram of residuals. Based on a bptest() for homoskedasticity and plotted residuals vs fitted values, we have heteroskadasticity (p<0.05). Based on the plot modeling the relationship between residuals and fitted values, there is not a clear linear relationship (fanning). After recomputing regression results with robust standard errors, standard error values increased for stroke1, bmi_c and intercept but not for stroke1:bmi_c. We still reject the null hypothesis of homoskedasticity.* 
+```{r}
+stroke$bmi_c <- stroke$bmi - mean(stroke$bmi)
+fit<-lm(age ~ stroke*bmi_c, data=stroke) #linear regression
+summary(fit)
+coeftest(fit, vcov = vcovHC(fit))[,1:2] #using robust standard errors
+
+ggplot(stroke, aes(bmi,age, color = stroke)) + geom_smooth(method = "lm", se = F, fullrange = T) + geom_point()+geom_vline(xintercept=0,lty=2)+geom_vline(xintercept=mean(stroke$bmi)) #plot of regression
+
+#assumptions
+bptest(fit) #testing heteroskedasticity assumption: Ho: homoskedsastic!
+resids<-fit$residuals #creating residuals vs fitted values plot
+fitvals<-fit$fitted.values
+plot(fitvals,resids); abline(h=0, col='red')
+par(mfrow=c(1,2)); hist(resids); qqnorm(resids); qqline(resids, col='red')
+```
+
+**4. Regression Model with Bootstrapped SEs (5 pts)**
+
+*After rerunning the same regression model with the interaction but computing bootstrapped standard errors, the SEs are very similar to the robust standard errors and slightly larger than the original SEs, likely indicating a smaller p-value.*
+```{r}
+samp_distn<-replicate(5000, {
+boot_dat <- sample_frac(stroke, replace=T) #take bootstrap sample of rows
+fit_boot_se <- lm(age~bmi_c*stroke, data=boot_dat) #fit model on bootstrap sample
+coef(fit_boot_se) #save coefs
+})
+
+samp_distn %>% t %>% as.data.frame %>% summarize_all(sd) # estimated SEs
+```
+
+
+**5. Logistic Regression (30 pts)** 
+
+*After running a logistic regression predicting heart disease (1=yes, 0=no) from age and bmi, it is revealed that when holding BMI constant, going up 1 year in age increases log-odds by 0.0804 and multiplies odds by a factor of e^1.0838. Going up 1 unit in BMI increases log-odds by 0.013443 and multiplies odds by a factor of e^1.0135. I computed a confusion matrix, revealing insights into the calculations for sensitivity, accuracy, specificity, precision and AUC. The accuracy of this regression was 0.95, sensitivity (TPR) was 0, specificity (TNR) was 1 and the auc was 0.849 (ppv not given). This means there are 0 true positives and zero false positives. Given a TPR of 0 and a TNR of 1, the model is not predicting individuals with heart disease very well. Additionally, an AUC of 0.849 indicates a decent, but not great, model. The ROC curve demonstrates how the model is not perfect as it curves up and to the right.*  
+
+```{r}
+maybe <- stroke %>% select(heart_disease, age, bmi) %>% mutate(y=ifelse(heart_disease=="1", 1, 0))
+fit_log<-glm(y~age + bmi,data=maybe,family=binomial(link="logit"))
+coeftest(fit_log)
+exp(coef(fit_log))
+
+maybe$prob <- predict(fit_log,type="response") #get predicted probabilities
+maybe$predicted <- ifelse(maybe$prob>.5,"heart disease","no heart disease") #get predicted outcomes
+maybe$logit<-predict(fit_log) #save predicted log-odds
+
+#DENSITY PLOT
+maybe%>%ggplot()+geom_density(aes(logit,color=heart_disease,fill=heart_disease), alpha=.4)+
+  theme(legend.position=c(.85,.85))+geom_vline(xintercept=0)+xlab("logit (log-odds)")+
+  geom_rug(aes(logit,color=heart_disease)) #density plot
+
+#CONFUSION MATRIX
+table(truth=maybe$heart_disease, prediction=maybe$predicted)%>%addmargins #confusion matrix
+
+class_diag(maybe$prob,maybe$heart_disease) #sensitivity, accuracy, other measures
+
+#ROC PLOT
+library(plotROC) #install.packages(plotROC)
+
+#geom_roc needs actual outcome (0,1) and predicted probability (or predictor if just one) 
+ROCplot<-ggplot(maybe)+geom_roc(aes(d=y,m=age + bmi), n.cuts=0) 
+ROCplot
+```
+
+**6.Logistic Regression with all variables (25 pts)**
+
+*After performing a logistic regression predicting heart disease from all of the other variables, the accuracy was 0.950 (proportion of correctly classified individuals), sensitivity was 0.0205 (TPR), specificity was 0.998 (TNR), precision (PPV) was 0.417 and the AUC was 0.874. This model performs slightly better than the previous with a higher AUC, however, precision and sensitivity are both very low indicating the proportion of individuals with heart disease correctly classified is low and the proportion classified as having heart disease who actually do is low. After running a 10 fold CV with the same model, average out of sample accuracy was 0.95, sensitivity was 0.0221, specificity was 0.999 and the AUC was 0.868. The 10 fold CV resulted in worse performance out of sample, indicating over-fitting. Compared to the in-sample metrics, acc is about the same, sensitivity is slightly lower and specificity is the same. After performing LASSO on the same model, the variables retained are genderMale, age, average glucose level and stroke1. I then performed a 10-fold CV using only those variables retained. The out of sample AUC for this model was 0.869. Compared to the AUC from the previous logistic regression, this AUC is very slightly larger (0.869 vs 0.868), indicating this model is not much better than the previous model. Finally, this AUC is decent but not great.*
+
+```{r}
+stroke2 <- stroke %>% select(-id,-bmi_c)
+head(stroke2) 
+fit_all <- glm(heart_disease~., data=stroke2, family="binomial") #logistic regression using all predictors
+exp(coef(fit_all))
+prob2<-predict(fit_all,type="response")
+class_diag(prob2,stroke2$heart_disease)
+
+#10 fold CV
+set.seed(1234)
+k=10
+
+data <- stroke2 %>% sample_frac #put rows of dataset in random order
+folds <- ntile(1:nrow(data),n=10) #create fold labels
+
+diags<-NULL
+for(i in 1:k){
+  train <- data[folds!=i,] #create training set (all but fold i)
+  test <- data[folds==i,] #create test set (just fold i)
+  truth <- test$heart_disease #save truth labels from fold i
+  
+  fit_last <- glm(heart_disease~., data=stroke2, family="binomial")
+  probs <- predict(fit_last, newdata=test, type="response")
+  
+  diags<-rbind(diags,class_diag(probs,truth))
+}
+
+summarize_all(diags,mean) #average diagnostics across all 10 folds
+
+#LASSO
+library(glmnet)
+y<-as.matrix(stroke2$heart_disease) #grab response
+x<-model.matrix(heart_disease~.,data=stroke2)[,-1] #grab predictors
+head(x)
+
+cv<-cv.glmnet(x,y,family="binomial")
+lasso<-glmnet(x,y,family="binomial",lambda=cv$lambda.1se)
+coef(lasso) 
+
+#10-fold CV with only LASSO selected variables
+set.seed(1234)
+k=10
+
+data2 <- stroke2 %>% sample_frac #put rows of dataset in random order
+folds <- ntile(1:nrow(data),n=10) #create fold labels
+
+
+diags<-NULL
+for(i in 1:k){
+  train2 <- data2[folds!=i,] #create training set (all but fold i)
+  test2 <- data2[folds==i,] #create test set (just fold i)
+  truth2 <- test2$heart_disease #save truth labels from fold i
+  
+  fit_final <- glm(heart_disease~ gender + age + avg_glucose_level + stroke, data2, family="binomial")
+  probs_final <- predict(fit_final, newdata=test2, type="response")
+  
+  diags<-rbind(diags,class_diag(probs_final,truth2))
+}
+
+diags%>%summarize_all(mean)
+```
+
+
+
+...
+
+
+
+
+
